@@ -12,8 +12,8 @@ uv.lock
 pyproject.toml
 .env
 .python-version
-backend/data
-backend/database
-backend/logs
-backend/media
-backend/models
+data
+database
+logs
+media
+models

@@ -3,153 +3,257 @@ import numpy as np
 import json
 import logging
 from pathlib import Path
-from typing import List, Dict, Tuple
+from typing import List, Dict
 import torch
 
 from config.settings import settings
 
 logger = logging.getLogger(__name__)
 
+# rag_engine.py
+import json
+import faiss
+import torch
+import logging
+from pathlib import Path
+from typing import List, Dict, Optional
+import pandas as pd
+from PIL import Image
+from tqdm import tqdm
+
+from transformers import CLIPProcessor, CLIPModel
+
+logger = logging.getLogger(__name__)
+
 class RAGEngine:
-    def __init__(self):
-        self.story_index: faiss.Index = None
-        self.image_index: faiss.Index = None
-        self.story_data: List[Dict] = []
-        self.image_data: List[Dict] = []
-        
-        self.story_db_path = settings.DATABASE_DIR / "stories.json"
-        self.image_db_path = settings.DATABASE_DIR / "images.json"
-        self.story_index_path = settings.DATABASE_DIR / "story_index.faiss"
-        self.image_index_path = settings.DATABASE_DIR / "image_index.faiss"
-    
-    def _create_index(self, dimension: int) -> faiss.Index:
-        """Create FAISS index with GPU support"""
-        if settings.FAISS_INDEX_TYPE == "IVFFlat":
-            quantizer = faiss.IndexFlatL2(dimension)
-            index = faiss.IndexIVFFlat(
-                quantizer, 
-                dimension, 
-                settings.FAISS_NLIST, 
-                faiss.METRIC_L2
-            )
-        else:
-            index = faiss.IndexFlatL2(dimension)
-        
-        # Move to GPU if available
+    def __init__(
+        self,
+        dataset_csv: str = "/home/ashish/Desktop/202418007/RAVSG/backend/data/merged_dataset.csv",
+        index_dir: Optional[str] = None
+    ):
+        self.dataset_csv = Path(dataset_csv)
+        self.index_dir = settings.DATABASE_DIR / "rag_indices" if index_dir is None else Path(index_dir)
+        self.index_dir.mkdir(parents=True, exist_ok=True)
+
+        # File paths
+        self.caption_index_path = self.index_dir / "caption_index.faiss"      # text embeddings
+        self.image_index_path   = self.index_dir / "image_index.faiss"        # image embeddings
+        self.caption_db_path     = self.index_dir / "captions.json"
+        self.image_db_path       = self.index_dir / "images.json"
+
+        # CLIP
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.processor = CLIPProcessor.from_pretrained(settings.EMBEDDING_MODEL)
+        self.model = CLIPModel.from_pretrained(settings.EMBEDDING_MODEL).to(self.device)
+        self.model.eval()
+
+        self.dimension = settings.EMBEDDING_DIM
+
+        # Indices & storage
+        self.caption_index: faiss.Index = None   # text embeddings (used for text queries)
+        self.image_index:   faiss.Index = None   # image embeddings (used for both text & image queries)
+        self.caption_data: List[Dict] = []       # metadata with cached text embeddings
+        self.image_data:   List[Dict] = []       # metadata with cached image embeddings
+
+    def _create_index(self) -> faiss.IndexFlatL2:
+        index = faiss.IndexFlatL2(self.dimension)
         if faiss.get_num_gpus() > 0:
             res = faiss.StandardGpuResources()
             index = faiss.index_cpu_to_gpu(res, 0, index)
-        
         return index
+
+    def embed_texts(self, texts: List[str]) -> torch.Tensor:
+        inputs = self.processor(text=texts, return_tensors="pt", padding=True, truncation=True).to(self.device)
+        with torch.no_grad():
+            emb = self.model.get_text_features(**inputs)
+        return torch.nn.functional.normalize(emb, p=2, dim=-1)
+
+    def embed_images(self, image_paths: List[str]) -> torch.Tensor:
+        images = []
+        for p in image_paths:
+            try:
+                img = Image.open(p).convert("RGB")
+                images.append(img)
+            except Exception as e:
+                logger.warning(f"Failed to load image {p}: {e}")
+                images.append(Image.new("RGB", (336, 336), (0, 0, 0)))
+        inputs = self.processor(images=images, return_tensors="pt").to(self.device)
+        with torch.no_grad():
+            emb = self.model.get_image_features(**inputs)
+        return torch.nn.functional.normalize(emb, p=2, dim=-1)
     
-    def load_or_create_indices(self):
-        """Load existing indices or create new ones"""
-        dimension = settings.EMBEDDING_DIM
-        
-        # Story index
-        if self.story_index_path.exists():
-            logger.info("Loading story index...")
-            self.story_index = faiss.read_index(str(self.story_index_path))
+    def add_image(self, image_embedding: torch.Tensor, metadata: Dict):
+        """Add a newly generated image + its embedding"""
+        emb_np = image_embedding.cpu().numpy().astype('float32').reshape(1, -1)
+
+        if self.image_index is None:
+            self.image_index = self._create_index()
+
+        self.image_index.add(emb_np)
+        self.image_data.append({
+            **metadata,
+            "embedding": image_embedding.tolist()  # cache for future reloads
+        })
+        self._save_images()
+        logger.info(f"Added new generated image to RAG (total: {len(self.image_data)})")
+
+    def add_story(self, text_embedding: torch.Tensor, caption: str, metadata: Dict = None):
+        """Optional: also add caption embedding if you want text→text search"""
+        emb_np = text_embedding.cpu().numpy().astype('float32').reshape(1, -1)
+        if self.caption_index is None:
+            self.caption_index = self._create_index()
+
+        self.caption_index.add(emb_np)
+        self.caption_data.append({
+            "caption": caption,
+            "metadata": metadata or {},
+            "embedding": text_embedding.tolist()
+        })
+        self._save_captions()
+
+    # ==============================================================
+    # Public API – matches your old naming exactly
+    # ==============================================================
+
+    def retrieve_stories(self, query_embedding: torch.Tensor, k: int = None) -> List[str]:
+        """
+        Used as: similar_stories = rag_engine.retrieve_stories(image_embedding, k=settings.TOP_K_RETRIEVAL)
+        → Returns list of captions (stories)
+        """
+        if k is None:
+            k = settings.TOP_K_RETRIEVAL
+
+        if not self.caption_index or self.caption_index.ntotal == 0:
+            return []
+
+        query_np = query_embedding.cpu().numpy().astype('float32')
+        _, I = self.caption_index.search(query_np, k)
+        return [
+            self.caption_data[i]["caption"]
+            for i in I[0] if 0 <= i < len(self.caption_data)
+        ]
+
+    def retrieve_image_metadata(self, query_embedding: torch.Tensor, k: int = None) -> List[Dict]:
+        """
+        Used as: similar_metadata = rag_engine.retrieve_image_metadata(text_embedding, k=settings.TOP_K_RETRIEVAL)
+        → Returns list of image metadata dicts (path + caption + etc.)
+        """
+        if k is None:
+            k = settings.TOP_K_RETRIEVAL
+
+        if not self.image_index or self.image_index.ntotal == 0:
+            return []
+
+        query_np = query_embedding.cpu().numpy().astype('float32')
+        _, I = self.image_index.search(query_np, k)
+        return [
+            self.image_data[i]
+            for i in I[0] if 0 <= i < len(self.image_data)
+        ]
+
+    # ==============================================================
+    # Building & Loading
+    # ==============================================================
+
+    def build_from_csv(self, batch_size: int = 64):
+        if not self.dataset_csv.exists():
+            raise FileNotFoundError(f"CSV not found: {self.dataset_csv}")
+
+        logger.info("Loading dataset for RAG build...")
+        df = pd.read_csv(self.dataset_csv)
+        if not {"image", "caption"}.issubset(df.columns):
+            raise ValueError("CSV must contain 'image' and 'caption' columns")
+
+        image_paths = [str(Path(p).resolve()) for p in df["image"].astype(str)]
+        captions = df["caption"].fillna("").tolist()
+
+        # Reset
+        self.caption_index = self._create_index()
+        self.image_index   = self._create_index()
+        self.caption_data.clear()
+        self.image_data.clear()
+
+        logger.info(f"Embedding {len(captions)} pairs (batch_size={batch_size})...")
+        for i in tqdm(range(0, len(captions), batch_size), desc="Building RAG"):
+            batch_paths = image_paths[i:i+batch_size]
+            batch_caps  = captions[i:i+batch_size]
+
+            text_embs = self.embed_texts(batch_caps)
+            img_embs  = self.embed_images(batch_paths)
+
+            text_np = text_embs.cpu().numpy().astype('float32')
+            img_np  = img_embs.cpu().numpy().astype('float32')
+
+            self.caption_index.add(text_np)
+            self.image_index.add(img_np)
+
+            for j in range(len(batch_caps)):
+                idx = i + j
+                self.caption_data.append({
+                    "index": idx,
+                    "caption": batch_caps[j],
+                    "image_path": batch_paths[j],
+                    "embedding": text_embs[j].cpu().tolist()
+                })
+                self.image_data.append({
+                    "index": idx,
+                    "caption": batch_caps[j],
+                    "image_path": batch_paths[j],
+                    "embedding": img_embs[j].cpu().tolist()
+                })
+
+        self.save()
+        logger.info(f"RAG build complete! Saved to {self.index_dir}")
+
+    def load(self):
+        """Fast load – call this on every app start"""
+        if self.caption_index_path.exists() and self.caption_db_path.exists():
+            self.caption_index = faiss.read_index(str(self.caption_index_path))
             if faiss.get_num_gpus() > 0:
                 res = faiss.StandardGpuResources()
-                self.story_index = faiss.index_cpu_to_gpu(res, 0, self.story_index)
-        else:
-            logger.info("Creating new story index...")
-            self.story_index = self._create_index(dimension)
-        
-        # Image index
-        if self.image_index_path.exists():
-            logger.info("Loading image index...")
+                self.caption_index = faiss.index_cpu_to_gpu(res, 0, self.caption_index)
+            with open(self.caption_db_path) as f:
+                self.caption_data = json.load(f)
+
+        if self.image_index_path.exists() and self.image_db_path.exists():
             self.image_index = faiss.read_index(str(self.image_index_path))
             if faiss.get_num_gpus() > 0:
                 res = faiss.StandardGpuResources()
                 self.image_index = faiss.index_cpu_to_gpu(res, 0, self.image_index)
-        else:
-            logger.info("Creating new image index...")
-            self.image_index = self._create_index(dimension)
-        
-        # Load metadata
-        if self.story_db_path.exists():
-            with open(self.story_db_path, 'r') as f:
-                self.story_data = json.load(f)
-        
-        if self.image_db_path.exists():
-            with open(self.image_db_path, 'r') as f:
+            with open(self.image_db_path) as f:
                 self.image_data = json.load(f)
-        
-        logger.info(f"Loaded {len(self.story_data)} stories, {len(self.image_data)} images")
-    
-    def add_story(self, embedding: torch.Tensor, story: str, metadata: Dict = None):
-        """Add story to RAG database"""
-        emb_np = embedding.numpy().astype('float32')
-        
-        if self.story_index.ntotal == 0 and isinstance(self.story_index, faiss.IndexIVFFlat):
-            # Train index if empty
-            self.story_index.train(emb_np)
-        
-        self.story_index.add(emb_np)
-        
-        self.story_data.append({
-            "story": story,
-            "metadata": metadata or {}
-        })
-        
-        self._save_stories()
-    
-    def add_image(self, embedding: torch.Tensor, metadata: Dict):
-        """Add image metadata to RAG database"""
-        emb_np = embedding.numpy().astype('float32')
-        
-        if self.image_index.ntotal == 0 and isinstance(self.image_index, faiss.IndexIVFFlat):
-            self.image_index.train(emb_np)
-        
-        self.image_index.add(emb_np)
-        
-        self.image_data.append(metadata)
-        
-        self._save_images()
-    
-    def retrieve_stories(self, query_embedding: torch.Tensor, k: int = 5) -> List[str]:
-        """Retrieve top-k similar stories"""
-        if self.story_index.ntotal == 0:
-            return []
-        
-        query_np = query_embedding.numpy().astype('float32')
-        distances, indices = self.story_index.search(query_np, min(k, self.story_index.ntotal))
-        
-        return [self.story_data[idx]["story"] for idx in indices[0] if idx < len(self.story_data)]
-    
-    def retrieve_image_metadata(self, query_embedding: torch.Tensor, k: int = 5) -> List[Dict]:
-        """Retrieve top-k similar image metadata"""
-        if self.image_index.ntotal == 0:
-            return []
-        
-        query_np = query_embedding.numpy().astype('float32')
-        distances, indices = self.image_index.search(query_np, min(k, self.image_index.ntotal))
-        
-        return [self.image_data[idx] for idx in indices[0] if idx < len(self.image_data)]
-    
-    def _save_stories(self):
-        """Save story metadata to disk"""
-        with open(self.story_db_path, 'w') as f:
-            json.dump(self.story_data, f, indent=2)
-        
-        # Save index to CPU first
-        if faiss.get_num_gpus() > 0:
-            cpu_index = faiss.index_gpu_to_cpu(self.story_index)
-            faiss.write_index(cpu_index, str(self.story_index_path))
-        else:
-            faiss.write_index(self.story_index, str(self.story_index_path))
-    
+
+        logger.info(f"RAG loaded: {len(self.image_data)} items")
+
+    def load_or_create_indices(self):
+        """This is the method your generation_worker.py calls"""
+        self.load()
+
     def _save_images(self):
-        """Save image metadata to disk"""
-        with open(self.image_db_path, 'w') as f:
-            json.dump(self.image_data, f, indent=2)
-        
-        if faiss.get_num_gpus() > 0:
-            cpu_index = faiss.index_gpu_to_cpu(self.image_index)
-            faiss.write_index(cpu_index, str(self.image_index_path))
-        else:
-            faiss.write_index(self.image_index, str(self.image_index_path))
+            with open(self.image_db_path, "w") as f:
+                json.dump(self.image_data, f, indent=2)
+            if self.image_index:
+                cpu_idx = faiss.index_gpu_to_cpu(self.image_index) if faiss.get_num_gpus() > 0 else self.image_index
+                faiss.write_index(cpu_idx, str(self.image_index_path))
+
+    def _save_captions(self):
+        with open(self.caption_db_path, "w") as f:
+            json.dump(self.caption_data, f, indent=2)
+        if self.caption_index:
+            cpu_idx = faiss.index_gpu_to_cpu(self.caption_index) if faiss.get_num_gpus() > 0 else self.caption_index
+            faiss.write_index(cpu_idx, str(self.caption_index_path))
+
+    def save(self):
+        self._save_images()
+        self._save_captions()
+
+
+    def reset(self):
+        """Delete everything and start fresh"""
+        for p in [self.caption_index_path, self.image_index_path,
+                  self.caption_db_path, self.image_db_path]:
+            if p.exists():
+                p.unlink()
+        logger.info("All RAG data reset.")
 
 rag_engine = RAGEngine()

@@ -31,6 +31,13 @@ def encode_image_to_base64(image: Image.Image, format: str = "PNG") -> str:
     img_str = base64.b64encode(buffered.getvalue()).decode()
     return f"data:image/{format.lower()};base64,{img_str}"
 
+# def encode_image_to_base64(image: Image.Image, format: str = "PNG") -> str:
+#     """Encode PIL Image to base64 string (without data URI prefix)"""
+#     buffered = BytesIO()
+#     image.save(buffered, format=format)
+#     img_str = base64.b64encode(buffered.getvalue()).decode()
+#     return img_str
+
 def resize_image(image: Image.Image, max_size: int = 1024) -> Image.Image:
     """Resize image maintaining aspect ratio"""
     width, height = image.size

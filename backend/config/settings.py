@@ -1,6 +1,10 @@
 import os
 from pathlib import Path
+from typing import Tuple
 from pydantic_settings import BaseSettings
+from dotenv import load_dotenv  
+
+load_dotenv("/home/ashish/Desktop/202418007/RAVSG/backend/.env")
 
 class Settings(BaseSettings):
     # Paths
@@ -11,13 +15,14 @@ class Settings(BaseSettings):
     LOGS_DIR: Path = BASE_DIR / "logs"
     
     # Model Configuration
-    VISION_LANGUAGE_MODEL: str = "llava-hf/llava-v1.6-mistral-7b-hf"
-    TEXT_TO_IMAGE_MODEL: str = "stabilityai/stable-diffusion-3.5-large-turbo"     #city96/stable-diffusion-3.5-large-turbo-gguf
-    EMBEDDING_MODEL: str = "Salesforce/blip2-opt-2.7b"  # Better than CLIP for multimodal
+    VISION_LANGUAGE_MODEL: str = "llava-hf/llava-1.5-7b-hf"
+    TEXT_TO_IMAGE_MODEL: str = "runwayml/stable-diffusion-v1-5"   #"stabilityai/stable-diffusion-3.5-medium" #"stabilityai/stable-diffusion-3.5-large-turbo"     
+    EMBEDDING_MODEL: str = "openai/clip-vit-base-patch16"    #"Salesforce/blip2-opt-2.7b"  # Better than CLIP for multimodal
     
     # Device Settings
     DEVICE: str = "cuda"
     USE_FP16: bool = True
+    USE_4BIT: bool = True
     USE_8BIT: bool = False
     
     # Generation Parameters
@@ -26,12 +31,16 @@ class Settings(BaseSettings):
     TOP_P: float = 0.9
     NUM_INFERENCE_STEPS: int = 20
     GUIDANCE_SCALE: float = 7.5
+    MAX_CONTEXT_CHARS: int = 3000
     IMAGE_SIZE: int = 1024
+    MAX_STORY_EXCERPT: int = 500                  # max chars for short_story
+    MAX_PIXEL_COUNT: int = 1024*1024              # max total pixels
+    MAX_IMAGE_DIM: Tuple[int, int] = (1024, 1024) # max width & height when resizing
     
     # RAG Configuration
-    EMBEDDING_DIM: int = 1408  # BLIP-2 dimension
+    EMBEDDING_DIM: int = 512  
     TOP_K_RETRIEVAL: int = 5
-    FAISS_INDEX_TYPE: str = "IVFFlat"
+    FAISS_INDEX_TYPE: str = "Flat"  # Options: "Flat", "IVFFlat"
     FAISS_NLIST: int = 100
     
     # Redis Configuration
@@ -44,7 +53,9 @@ class Settings(BaseSettings):
     LANGFUSE_PUBLIC_KEY: str = os.getenv("LANGFUSE_PUBLIC_KEY", "")
     LANGFUSE_SECRET_KEY: str = os.getenv("LANGFUSE_SECRET_KEY", "")
     LANGFUSE_HOST: str = "http://localhost:3000"
+    LANGFUSE_BASE_URL: str = "http://localhost:3000"
     ENABLE_LANGFUSE: bool = False
+    LANGFUSE_SAMPLE_RATE: float = 1.0  # 0.0 to 1.0
     
     # API Configuration
     API_HOST: str = "0.0.0.0"

@@ -284,8 +284,8 @@
                                     ✨
                                 </div>
                                 <div>
-                                    <h1 class="text-stone-700 font-bold text-xl">StoryGen AI</h1>
-                                    <p class="text-stone-500 text-xs">BLIP-2 + LLaVA-NeXT + SD 3.5</p>
+                                    <h1 class="text-stone-700 font-bold text-xl">Visual Storytelling with MultiModal LMs</h1>
+                                    <p class="text-stone-500 text-xs">openai/clip & llava-hf/llava-v1.6-mistral-7b-hf & stable-diffusion-v1-5</p>
                                 </div>
                             </div>
                             <div class="flex items-center gap-3">
@@ -517,7 +517,7 @@
 
                         <!-- Technology Stack -->
                         <div class="glass-strong rounded-3xl p-8 mb-8 shadow-md">
-                            <h3 class="text-2xl font-bold text-stone-800 mb-6 text-center">⚡ Powered By Cutting-Edge AI</h3>
+                            <h3 class="text-2xl font-bold text-stone-800 mb-6 text-center">Powered By Cutting-Edge Multimodal Models</h3>
                             <div class="grid md:grid-cols-4 gap-6">
                                 <div class="feature-card text-center p-6 rounded-2xl">
                                     <div class="w-16 h-16 bg-gradient-to-br from-stone-400 to-stone-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -525,7 +525,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                         </svg>
                                     </div>
-                                    <h4 class="text-stone-800 font-semibold mb-2">BLIP-2</h4>
+                                    <h4 class="text-stone-800 font-semibold mb-2">openai/clip</h4>
                                     <p class="text-stone-600 text-sm">1408D multimodal embeddings for superior understanding</p>
                                 </div>
 
@@ -535,7 +535,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
                                         </svg>
                                     </div>
-                                    <h4 class="text-stone-800 font-semibold mb-2">FAISS IVFFlat</h4>
+                                    <h4 class="text-stone-800 font-semibold mb-2">FAISS Flat</h4>
                                     <p class="text-stone-600 text-sm">GPU-accelerated vector search with RAG</p>
                                 </div>
 
@@ -545,7 +545,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path>
                                         </svg>
                                     </div>
-                                    <h4 class="text-stone-800 font-semibold mb-2">LLaVA-NeXT</h4>
+                                    <h4 class="text-stone-800 font-semibold mb-2">llava-v1.6-mistral-7b-hf</h4>
                                     <p class="text-stone-600 text-sm">Mistral-7B vision-language reasoning</p>
                                 </div>
 
@@ -555,7 +555,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path>
                                         </svg>
                                     </div>
-                                    <h4 class="text-stone-800 font-semibold mb-2">SD 3.5 Turbo</h4>
+                                    <h4 class="text-stone-800 font-semibold mb-2">stable-diffusion-v1-5</h4>
                                     <p class="text-stone-600 text-sm">Fastest, highest-quality image synthesis</p>
                                 </div>
                             </div>
@@ -588,156 +588,143 @@
             }
         }
 
-        window.switchMode = function(newMode) {
-            mode = newMode;
-            imagePreview = '';
-            storyInput = '';
-            output = '';
-            error = '';
-            currentJobId = null;
-            render();
+        window.switchMode=function(newMode){mode=newMode;imagePreview='';storyInput='';output='';error='';currentJobId=null;render();}
+        window.handleImageUpload=function(e){const file=e.target.files[0];if(file){if(file.size>10*1024*1024){error='File size exceeds 10MB';render();return;}const reader=new FileReader();reader.onloadend=function(){imagePreview=reader.result;error='';render();};reader.readAsDataURL(file);}}
+        window.clearImage=function(){imagePreview='';document.getElementById('image-upload').value='';render();}
+
+        window.handleGenerate=async function(){
+            if(mode==='image-to-story') await generateStory();
+            else await generateImage();
         }
 
-        window.handleImageUpload = function(event) {
-            const file = event.target.files[0];
-            if (file) {
-                if (file.size > 10 * 1024 * 1024) {
-                    error = 'File size exceeds 10MB limit';
-                    render();
-                    return;
-                }
-                const reader = new FileReader();
-                reader.onloadend = function() {
-                    imagePreview = reader.result;
-                    error = '';
-                    render();
-                };
-                reader.readAsDataURL(file);
-            }
-        }
-
-        window.clearImage = function() {
-            imagePreview = '';
-            document.getElementById('image-upload').value = '';
-            render();
-        }
-
-        /**
-         * Generate story from image with async job queue
-         */
-        async function generateStory() {
-            if (!imagePreview) {
-                error = 'Please upload an image first';
-                render();
-                return;
-            }
-
-            loading = true;
-            error = '';
-            render();
-
-            try {
-                // Submit job to async queue
-                const submitRes = await fetch('http://localhost:8000/generate-story', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ image: imagePreview })
+        async function generateStory(){
+            if(!imagePreview){error='Please upload an image first';render();return;}
+            loading=true;error='';render();
+            try{
+                const submitRes=await fetch('http://localhost:8000/generate-story',{
+                    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({image:imagePreview})
                 });
-
-                if (!submitRes.ok) {
-                    throw new Error(`HTTP ${submitRes.status}: Failed to submit job`);
-                }
-
-                const { job_id } = await submitRes.json();
-                currentJobId = job_id;
-
-                // Poll for job completion
-                const result = await pollJobStatus(job_id);
-                
-                // Extract result based on response structure
-                output = result.story || result.result?.story || result.result;
-                
-            } catch (err) {
-                error = `Generation failed: ${err.message}. Ensure backend is running on localhost:8000`;
-                console.error('Story generation error:', err);
-            } finally {
-                loading = false;
-                currentJobId = null;
-                render();
-            }
+                if(!submitRes.ok) throw new Error(`HTTP ${submitRes.status}`);
+                const {job_id}=await submitRes.json(); currentJobId=job_id;
+                const resultData=await pollJobStatus(job_id);
+                console.log(resultData);
+                output=resultData.result?.story||resultData.result?.text||resultData.story||resultData.text||'';
+                if(!output) throw new Error('No story found in server response');
+            }catch(err){error=`Generation failed: ${err.message}`;console.error(err);}finally{loading=false;currentJobId=null;render();}
         }
 
-        /**
-         * Generate image from story with async job queue
-         */
-        async function generateImage() {
-            if (!storyInput.trim()) {
-                error = 'Please enter a story first';
-                render();
-                return;
-            }
-
-            loading = true;
-            error = '';
-            render();
-
-            try {
-                // Submit job to async queue
-                const submitRes = await fetch('http://localhost:8000/generate-image', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ story: storyInput })
+        
+         async function generateImage(){
+            if(!storyInput.trim()){error='Please enter a story first';render();return;}
+            loading=true;error='';render();
+            try{
+                console.log('=== Starting image generation ===');
+                console.log('Story length:', storyInput.length);
+                
+                const submitRes=await fetch('http://localhost:8000/generate-image',{
+                    method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({story:storyInput})
                 });
-
-                if (!submitRes.ok) {
-                    throw new Error(`HTTP ${submitRes.status}: Failed to submit job`);
+                
+                console.log('Submit response status:', submitRes.status);
+                
+                if(!submitRes.ok) {
+                    const errorText = await submitRes.text();
+                    console.error('Submit error:', errorText);
+                    throw new Error(`HTTP ${submitRes.status}: ${errorText}`);
                 }
-
-                const { job_id } = await submitRes.json();
+                
+                const submitData = await submitRes.json();
+                console.log('Submit response:', submitData);
+                
+                const job_id = submitData.job_id;
+                
+                if (!job_id || typeof job_id !== 'string' || job_id.trim() === '') {
+                    throw new Error(`Invalid job_id received: ${JSON.stringify(job_id)}`);
+                }
+                
+                console.log('Job ID:', job_id);
                 currentJobId = job_id;
-
-                // Poll for job completion
-                const result = await pollJobStatus(job_id);
                 
-                // Extract result based on response structure
-                output = result.image_url || result.result?.image_url || result.result;
+                const resultData = await pollJobStatus(job_id);
+                console.log('=== Full result data ===');
+                console.log(JSON.stringify(resultData, null, 2));
+                console.log('=== Result keys ===', Object.keys(resultData));
+                if(resultData.result) console.log('=== Result.keys ===', Object.keys(resultData.result));
                 
-            } catch (err) {
-                error = `Generation failed: ${err.message}. Ensure backend is running on localhost:8000`;
-                console.error('Image generation error:', err);
-            } finally {
-                loading = false;
-                currentJobId = null;
-                render();
-            }
+                // Try multiple possible locations for image data
+                let imageData = '';
+                
+                // Check all possible nested paths
+                if (resultData.result?.image_url) {
+                    console.log('Found: result.image_url');
+                    imageData = resultData.result.image_url;
+                } else if (resultData.result?.image) {
+                    console.log('Found: result.image');
+                    imageData = resultData.result.image;
+                } else if (resultData.image_url) {
+                    console.log('Found: image_url');
+                    imageData = resultData.image_url;
+                } else if (resultData.image) {
+                    console.log('Found: image');
+                    imageData = resultData.image;
+                } else if (typeof resultData.result === 'string') {
+                    console.log('Found: result is string');
+                    imageData = resultData.result;
+                }
+                
+                console.log('=== Image data info ===');
+                console.log('Type:', typeof imageData);
+                console.log('Length:', imageData?.length || 0);
+                console.log('First 100 chars:', imageData?.substring(0, 100));
+                
+                if(!imageData) {
+                    console.error('Full result structure:', JSON.stringify(resultData, null, 2));
+                    throw new Error('No image data found in response. Check console logs above.');
+                }
+                
+                if(typeof imageData !== 'string') {
+                    throw new Error(`Image data is ${typeof imageData}, expected string`);
+                }
+                
+                if(!imageData.startsWith('data:image/')) {
+                    throw new Error(`Invalid image format. Got: ${imageData.substring(0, 50)}...`);
+                }
+                
+                console.log('✓ Valid image data URI found');
+                output=imageData;
+            }catch(err){
+                console.error('=== Error details ===');
+                console.error('Error name:', err.name);
+                console.error('Error message:', err.message);
+                console.error('Full error:', err);
+                error=`Generation failed: ${err.message}`;
+            }finally{loading=false;currentJobId=null;render();}
+        }
+        
+        window.downloadImage=function(){
+            if(!output){alert('No image to download');return;}
+            try{
+                const [header,base64Data]=output.split(',');
+                const byteCharacters=atob(base64Data);
+                const byteNumbers=new Array(byteCharacters.length);
+                for(let i=0;i<byteCharacters.length;i++) byteNumbers[i]=byteCharacters.charCodeAt(i);
+                const byteArray=new Uint8Array(byteNumbers);
+                const mimeMatch=header.match(/data:(image\/\w+);base64/);
+                const mimeType=mimeMatch?mimeMatch[1]:'image/png';
+                const blob=new Blob([byteArray],{type:mimeType});
+                const url=URL.createObjectURL(blob);
+                const a=document.createElement('a');a.style.display='none';a.href=url;a.download=`storygen-${Date.now()}.${mimeType.split('/')[1]||'png'}`;
+                document.body.appendChild(a);a.click();
+                setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url);},100);
+            }catch(err){alert(`Failed to download image: ${err.message}`);}
         }
 
-        window.handleGenerate = function() {
-            if (mode === 'image-to-story') {
-                generateStory();
-            } else {
-                generateImage();
-            }
-        }
-
-        window.downloadImage = function() {
-            const a = document.createElement('a');
-            a.href = output;
-            a.download = `storygen-${Date.now()}.png`;
-            a.click();
-        }
-
-        window.copyToClipboard = function() {
-            navigator.clipboard.writeText(output).then(() => {
-                const btn = event.target.closest('button');
-                const originalHTML = btn.innerHTML;
-                btn.innerHTML = `
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
-                    </svg>
-                    Copied!
-                `;
-                setTimeout(() => { btn.innerHTML = originalHTML; }, 2000);
+        window.copyToClipboard=function(){
+            navigator.clipboard.writeText(output).then(()=>{
+                const btn=event.target.closest('button');
+                const originalHTML=btn.innerHTML;
+                btn.innerHTML=`<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Copied!`;
+                setTimeout(()=>{btn.innerHTML=originalHTML;},2000);
             });
         }
 

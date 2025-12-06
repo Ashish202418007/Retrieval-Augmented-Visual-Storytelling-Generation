@@ -269,3 +269,8 @@ MIT License - Free for research and commercial use
 ---
 
 **Questions?** Check FastAPI auto-docs at `/docs` endpoint!
+
+<!-- Setting: The desolate, red-hued surface of the moon.
+Subjects: A lone astronaut in a retro-futuristic spacesuit carefully plants a single, bright red flower in the lunar soil.
+Atmosphere: A mix of isolation and hope. The Earth is visible as a blue and white marble in the inky black sky.
+Keywords: Astronaut, planting flower, red moon, desolate, Earth in sky, hope, isolated, retro-futuristic. -->

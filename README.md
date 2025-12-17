@@ -9,20 +9,21 @@ Production-grade system for bidirectional story-image generation using SOTA open
 │   FastAPI   │ ← REST API
 └──────┬──────┘
        │
-       ├──→ Redis Queue ──→ Story Worker (LLaVA-NeXT)
-       │                   └─→ BLIP-2 Embeddings
+       ├──→ Redis Queue ──→ Story Worker (LLaVA)
+       │                   └─→ CLIP Embeddings
        │                       └─→ FAISS RAG
        │
-       └──→ Redis Queue ──→ Image Worker (SD 3.5 Turbo)
-                           └─→ BLIP-2 Embeddings
+       └──→ Redis Queue ──→ Image Worker (Stable Diffusion)
+                           └─→ CLIP Embeddings
                                └─→ FAISS RAG
 ```
+
 ## Models Used
 
-- **Embeddings**: Salesforce/blip2-opt-2.7b (1408D multimodal embeddings)
-- **Image→Story**: llava-hf/llava-v1.6-mistral-7b-hf
-- **Story→Image**: stabilityai/stable-diffusion-3.5-large-turbo
-- **Vector DB**: FAISS with GPU acceleration
+* **Embeddings**: `openai/clip-vit-base-patch16` (512D multimodal embeddings)
+* **Image→Story**: `llava-hf/llava-1.5-7b-hf`
+* **Story→Image**: `runwayml/stable-diffusion-v1-5`
+* **Vector DB**: FAISS (Flat or IVFFlat)
 
 ## Quick Start
 
@@ -106,9 +107,9 @@ Edit `config/settings.py` or create `.env`:
 
 ```env
 # Models
-VISION_LANGUAGE_MODEL=llava-hf/llava-v1.6-mistral-7b-hf
-TEXT_TO_IMAGE_MODEL=stabilityai/stable-diffusion-3.5-large-turbo
-EMBEDDING_MODEL=Salesforce/blip2-opt-2.7b
+VISION_LANGUAGE_MODEL=llava-hf/llava-1.5-7b-hf
+TEXT_TO_IMAGE_MODEL=runwayml/stable-diffusion-v1-5
+EMBEDDING_MODEL=openai/clip-vit-base-patch16
 
 # Performance
 DEVICE=cuda
@@ -116,8 +117,10 @@ USE_FP16=true
 USE_8BIT=false
 
 # RAG
-EMBEDDING_DIM=1408
+EMBEDDING_DIM=512
 TOP_K_RETRIEVAL=5
+FAISS_INDEX_TYPE=Flat   # Options: Flat, IVFFlat
+FAISS_NLIST=100
 
 # Redis
 REDIS_HOST=localhost
@@ -131,17 +134,18 @@ LANGFUSE_SECRET_KEY=sk-...
 
 ## GPU Memory Management
 
-For RTX 5090 (32GB VRAM):
+For RTX-class GPUs:
 
 1. **Single worker per GPU**: Each worker loads one model at a time
 2. **Lazy loading**: Models loaded on-demand, unloaded after use
-3. **FP16 precision**: Reduces memory by 50%
-4. **Optional 8-bit**: For memory-constrained scenarios
+3. **FP16 precision**: Reduces memory footprint
+4. **Optional 8-bit**: For memory-constrained environments
 
-Memory usage estimates:
-- BLIP-2: ~5GB
-- LLaVA-NeXT: ~14GB
-- SD 3.5 Turbo: ~12GB
+Approximate memory usage:
+
+* CLIP ViT-B/16: ~1GB
+* LLaVA 1.5 7B: ~13GB
+* Stable Diffusion v1.5: ~6GB
 
 ## Project Structure
 
@@ -174,13 +178,14 @@ backend
 
 The system maintains two FAISS indices:
 
-1. **Story Index**: Stores embeddings of generated stories
-2. **Image Index**: Stores embeddings and metadata of generated images
+1. **Story Index**: Stores CLIP embeddings of generated stories
+2. **Image Index**: Stores CLIP embeddings and metadata of generated images
 
 During generation:
-- Retrieves top-K similar examples
-- Provides context to generation models
-- Improves consistency and quality over time
+
+* Retrieves top-K similar examples
+* Provides context to generation models
+* Improves consistency and quality over time
 
 ## Observability
 
@@ -194,11 +199,12 @@ LANGFUSE_SECRET_KEY = "sk-..."
 ```
 
 Tracks:
-- Generation latency
-- GPU memory usage
-- Embedding extraction
-- RAG retrieval performance
-- Error rates
+
+* Generation latency
+* GPU memory usage
+* Embedding extraction
+* RAG retrieval performance
+* Error rates
 
 ## Performance Tips
 
@@ -211,24 +217,27 @@ Tracks:
 ## Troubleshooting
 
 **Out of Memory**:
+
 ```bash
 # Enable 8-bit quantization
 USE_8BIT=true
 
 # Or reduce image size
-IMAGE_SIZE=768
+IMAGE_SIZE=512
 ```
 
 **Slow generation**:
+
 ```bash
 # Reduce inference steps
-NUM_INFERENCE_STEPS=15
+NUM_INFERENCE_STEPS=20
 
 # Scale workers
 docker-compose up --scale story_worker=3
 ```
 
 **Redis connection failed**:
+
 ```bash
 # Check Redis status
 redis-cli ping
@@ -236,7 +245,6 @@ redis-cli ping
 # Restart Redis
 redis-server --daemonize yes
 ```
-
 
 ## 🧪 Testing
 
@@ -248,16 +256,10 @@ python -c "from models.model_manager import ModelManager; m = ModelManager(); m.
 python -c "from rag.rag_engine import RAGEngine; from models.model_manager import ModelManager; m = ModelManager(); m.load_clip(); r = RAGEngine(m.clip_model, m.clip_processor, m.device); r.build_index(); print(f'RAG loaded with {len(r.examples)} examples')"
 ```
 
-<!-- ## 📚 Documentation
-
-- **FastAPI Docs**: http://localhost:8000/docs
-- **CLIP Paper**: https://arxiv.org/abs/2103.00020
-- **LLaVA**: https://llava-vl.github.io/
-- **VIST Dataset**: https://visionandlanguage.net/VIST/ -->
-
 ## 🤝 Contributing
 
 To add new features:
+
 1. Models: Edit `models/model_manager.py`
 2. RAG logic: Edit `rag/rag_engine.py`
 3. API endpoints: Edit `main.py`
@@ -269,6 +271,7 @@ MIT License - Free for research and commercial use
 ---
 
 **Questions?** Check FastAPI auto-docs at `/docs` endpoint!
+
 
 <!-- Setting: The desolate, red-hued surface of the moon.
 Subjects: A lone astronaut in a retro-futuristic spacesuit carefully plants a single, bright red flower in the lunar soil.

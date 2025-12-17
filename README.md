@@ -3,8 +3,11 @@ Production-grade system for bidirectional story-image generation using SOTA open
 
 ### Authors : 
 Ashish Kar(202418007)
+
 Misty Roy(202418033)
+
 Yashraj Sinh(202418064)
+
 Pragnya Dandavate(202418065)
 
 ## Architecture

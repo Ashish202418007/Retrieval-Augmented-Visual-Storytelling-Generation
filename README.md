@@ -1,16 +1,20 @@
-# RAVSG: Story-Image Bidirectional Generator
- Studio Ghibli-inspired bidirectional story-image generation using SOTA open-source models with RAG enhancement.
+# RAVSG: Story–Image Bidirectional Generator
 
-### Authors : 
-Ashish Kar(202418007)
+**RAVSG** is a Studio Ghibli–inspired bidirectional story–image generation framework that leverages state-of-the-art open-source models, enhanced with Retrieval-Augmented Generation (RAG).
 
-Misty Roy(202418033)
+---
 
-Yashraj Sinh(202418064)
+### 👥 Authors
+- **Ashish Kar** (202418007)  
+- **Misty Roy** (202418033)  
+- **Yashraj Sinh** (202418064)  
+- **Pragnya Dandavate** (202418065)  
 
-Pragnya Dandavate(202418065)
+---
 
-Refer to documentation [here](Project_documentation.pdf)
+📄 **Project Documentation**  
+Refer to the full documentation [here](Project_documentation.pdf).
+
 
 ## Architecture
 

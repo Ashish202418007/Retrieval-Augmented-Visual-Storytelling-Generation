@@ -150,28 +150,33 @@ Approximate memory usage:
 ## Project Structure
 
 ```
-backend
-├── api/
-│   └── server.py              # FastAPI endpoints
-├── config/
-│   └── settings.py            # Configuration
-├── core/
-│   ├── model_manager.py       # Model loading & inference
-│   ├── rag_engine.py          # FAISS vector database
-│   ├── queue_manager.py       # Redis job queue
-│   └── observability.py       # Langfuse tracing
-├── workers/
-│   └── generation_worker.py   # Async job processor
-├── utils/
-│   └── image_utils.py         # Image encoding/decoding
-├── database/                  # FAISS indices
-├── models/                    # Model weights cache
-├── media/                     # Generated content
-├── logs/                      # Application logs
-├── requirements.txt
-├── Dockerfile
-├── docker-compose.yml
-└── README.md
+root
+├── backend
+│   ├── api/
+│   │   └── server.py              # FastAPI endpoints
+│   ├── config/
+│   │   └── settings.py            # Configuration
+│   ├── core/
+│   │   ├── model_manager.py       # Model loading & inference
+│   │   ├── rag_engine.py          # FAISS vector database
+│   │   ├── queue_manager.py       # Redis job queue
+│   │   └── observability.py       # Langfuse tracing
+│   ├── workers/
+│   │   └── generation_worker.py   # Async job processor
+│   ├── utils/
+│   │   └── image_utils.py         # Image encoding/decoding
+│   ├── database/                  # FAISS indices
+│   ├── models/                    # Model weights cache
+│   ├── media/                     # Generated content
+│   └── logs/                      # Application logs
+│
+├── frontend
+│   └── app.html                   # Frontend UI (static or SPA entry)
+│
+├── README.md                      # Project documentation
+├── requirements.txt               # Python dependencies
+├── .gitignore                     # Git ignore rules
+
 ```
 
 ## RAG System

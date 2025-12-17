@@ -48,6 +48,7 @@ python workers/generation_worker.py story
 python workers/generation_worker.py image
 ```
 
+<!-- 
 ### Docker Setup
 
 ```bash
@@ -55,8 +56,9 @@ python workers/generation_worker.py image
 docker-compose up --build
 
 # Scale workers
-docker-compose up --scale story_worker=2 --scale image_worker=2
+docker-compose up --scale story_worker=2 --scale image_worker=2 -->
 ```
+
 
 ## API Usage
 
@@ -146,7 +148,7 @@ Memory usage estimates:
 ## Project Structure
 
 ```
-.
+backend
 ├── api/
 │   └── server.py              # FastAPI endpoints
 ├── config/
@@ -248,12 +250,12 @@ python -c "from models.model_manager import ModelManager; m = ModelManager(); m.
 python -c "from rag.rag_engine import RAGEngine; from models.model_manager import ModelManager; m = ModelManager(); m.load_clip(); r = RAGEngine(m.clip_model, m.clip_processor, m.device); r.build_index(); print(f'RAG loaded with {len(r.examples)} examples')"
 ```
 
-## 📚 Documentation
+<!-- ## 📚 Documentation
 
 - **FastAPI Docs**: http://localhost:8000/docs
 - **CLIP Paper**: https://arxiv.org/abs/2103.00020
 - **LLaVA**: https://llava-vl.github.io/
-<!-- - **VIST Dataset**: https://visionandlanguage.net/VIST/ -->
+- **VIST Dataset**: https://visionandlanguage.net/VIST/ -->
 
 ## 🤝 Contributing
 

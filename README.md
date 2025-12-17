@@ -1,4 +1,4 @@
-# Story-Image Bidirectional Generator
+# RAVSG: Story-Image Bidirectional Generator
 
 Production-grade system for bidirectional story-image generation using SOTA open-source models with RAG enhancement.
 

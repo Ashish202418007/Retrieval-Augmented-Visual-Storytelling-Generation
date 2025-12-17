@@ -10,6 +10,8 @@ Yashraj Sinh(202418064)
 
 Pragnya Dandavate(202418065)
 
+Refer to documentation [here](Project_documentation.pdf)
+
 ## Architecture
 
 ```

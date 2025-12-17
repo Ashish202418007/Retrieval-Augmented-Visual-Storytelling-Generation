@@ -17,7 +17,6 @@ Production-grade system for bidirectional story-image generation using SOTA open
                            └─→ BLIP-2 Embeddings
                                └─→ FAISS RAG
 ```
-
 ## Models Used
 
 - **Embeddings**: Salesforce/blip2-opt-2.7b (1408D multimodal embeddings)
@@ -56,9 +55,8 @@ python workers/generation_worker.py image
 docker-compose up --build
 
 # Scale workers
-docker-compose up --scale story_worker=2 --scale image_worker=2 -->
-```
-
+docker-compose up --scale story_worker=2 --scale image_worker=2 
+```-->
 
 ## API Usage
 
